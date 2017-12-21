@@ -12,7 +12,8 @@ import com.kk.solution.dev.androideatmaster.R;
  * Created by kundan on 12/16/2017.
  */
 
-public class OrderViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener,View.OnCreateContextMenuListener {
+public class OrderViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener,
+        View.OnCreateContextMenuListener {
 
     public TextView txtOrderId, txtOrderStatus, txtOrderPhone, txtOrderAddress;
 
@@ -45,6 +46,6 @@ public class OrderViewHolder extends RecyclerView.ViewHolder implements View.OnC
         contextMenu.setHeaderTitle("Select the Action");
 
         contextMenu.add(0,0,getAdapterPosition(),"Update");
-        contextMenu.add(0,1,getAdapterPosition(),"Update");
+        contextMenu.add(0,1,getAdapterPosition(),"Delete");
     }
 }

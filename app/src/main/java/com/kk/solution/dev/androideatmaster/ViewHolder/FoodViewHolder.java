@@ -11,7 +11,7 @@ import com.kk.solution.dev.androideatmaster.Interface.ItemClickListener;
 import com.kk.solution.dev.androideatmaster.R;
 
 /**
- * Created by kunda on 12/16/2017.
+ * Created by kundan on 12/16/2017.
  */
 
 public class FoodViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener,View.OnCreateContextMenuListener{

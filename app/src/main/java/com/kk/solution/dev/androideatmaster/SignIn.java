@@ -50,7 +50,9 @@ public class SignIn extends AppCompatActivity {
 
     private void signInUser(final String phone, String password) {
         final ProgressDialog mDialog = new ProgressDialog(this);
-        mDialog.setMessage("Please wait...");
+        mDialog.setTitle("STAFF LOG-IN");
+        mDialog.setMessage("Please wait! while we check your credential!!");
+        mDialog.setCanceledOnTouchOutside(false);
         mDialog.show();
 
         final String localPhone = phone;
