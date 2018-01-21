@@ -21,7 +21,7 @@ import com.kk.solution.dev.androideatmaster.R;
 import java.util.Random;
 
 /**
- * Created by kundan on 12/22/2017.
+ * Created by kundan on 12/21/2017.
  */
 
 public class MyFirebaseMessaging extends FirebaseMessagingService{
