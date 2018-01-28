@@ -10,7 +10,6 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
@@ -22,247 +21,104 @@ import android.widget.Toast;
 
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
 import com.firebase.ui.database.FirebaseRecyclerOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Query;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.kk.solution.dev.androideatmaster.Common.Common;
 import com.kk.solution.dev.androideatmaster.Interface.ItemClickListener;
-import com.kk.solution.dev.androideatmaster.Model.Category;
+import com.kk.solution.dev.androideatmaster.Model.Banner;
 import com.kk.solution.dev.androideatmaster.Model.Food;
+import com.kk.solution.dev.androideatmaster.ViewHolder.BannerViewHolder;
 import com.kk.solution.dev.androideatmaster.ViewHolder.FoodViewHolder;
 import com.rengwuxian.materialedittext.MaterialEditText;
 import com.squareup.picasso.Picasso;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import info.hoang8f.widget.FButton;
 
-public class FoodList extends AppCompatActivity {
+public class BannerActivity extends AppCompatActivity {
 
     RecyclerView recyclerView;
     RecyclerView.LayoutManager layoutManager;
 
     FloatingActionButton fab;
 
+    RelativeLayout rootLayout;
+
     //firebase
     FirebaseDatabase db;
-    DatabaseReference foodList;
+    DatabaseReference banners;
     FirebaseStorage storage;
     StorageReference storageReference;
 
-    String categoryId = "";
+    FirebaseRecyclerAdapter<Banner,BannerViewHolder> adapter;
 
-    FirebaseRecyclerAdapter<Food,FoodViewHolder> adapter;
+    MaterialEditText edtName,edtFoodId;
+    FButton btnUpload,btnSelect;
 
-    //add new food
-    MaterialEditText edtName,edtDescription,edtPrice,edtDiscount;
-    FButton btnSelect,btnUpload;
-
-    Food newFood;
-
-    RelativeLayout rootLayout;
-
-    Uri saveUri;
+    Banner newBanner;
+    Uri filePath;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_food_list);
+        setContentView(R.layout.activity_banner);
 
-        //firebase
         db = FirebaseDatabase.getInstance();
-        foodList = db.getReference("Foods");
+        banners = db.getReference("Banner");
+
         storage = FirebaseStorage.getInstance();
         storageReference = storage.getReference();
 
-        //init
-        recyclerView = (RecyclerView)findViewById(R.id.recycler_food);
+        recyclerView = (RecyclerView)findViewById(R.id.recycler_banner);
         recyclerView.setHasFixedSize(true);
-        //layoutManager = new LinearLayoutManager(this);
-        //recyclerView.setLayoutManager(layoutManager);
-
-        recyclerView.setLayoutManager(new GridLayoutManager(this,2));
+        layoutManager = new LinearLayoutManager(this);
+        recyclerView.setLayoutManager(layoutManager);
 
         rootLayout = (RelativeLayout)findViewById(R.id.rootLayout);
-
 
         fab = (FloatingActionButton)findViewById(R.id.fab);
 
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showAddFoodDialog();
+                showAddBanner();
             }
         });
-
-        if (getIntent() != null)    {
-            categoryId = getIntent().getStringExtra("CategoryId");
-        }
-        if (!categoryId.isEmpty())   {
-            loadListFood(categoryId);
-        }
+        
+        loadListBanner();
     }
 
-    private void showAddFoodDialog() {
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(FoodList.this);
-        alertDialog.setTitle("Add new Food");
-        alertDialog.setMessage("Please fill full information");
+    private void loadListBanner() {
 
-        LayoutInflater inflater = this.getLayoutInflater();
-
-        View add_menu_layout = inflater.inflate(R.layout.add_new_food_layout,null);
-
-        edtName = add_menu_layout.findViewById(R.id.edtName);
-        edtDescription = add_menu_layout.findViewById(R.id.edtDescription);
-        edtPrice = add_menu_layout.findViewById(R.id.edtPrice);
-        edtDiscount = add_menu_layout.findViewById(R.id.edtDiscount);
-
-        btnSelect = add_menu_layout.findViewById(R.id.btnSelect);
-        btnUpload = add_menu_layout.findViewById(R.id.btnUpload);
-
-        //event for button
-        btnSelect.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                chooseImage();      //let user choose image
-            }
-        });
-
-        btnUpload.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                uploadImage();
-            }
-        });
-
-        alertDialog.setView(add_menu_layout);
-        alertDialog.setIcon(R.drawable.ic_shopping_cart_black_24dp);
-
-        //set button
-        alertDialog.setPositiveButton("YES", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialogInterface, int which) {
-
-                dialogInterface.dismiss();
-
-                if (newFood != null)    {
-                    foodList.push().setValue(newFood);
-                    Snackbar.make(rootLayout,"New Category "+newFood.getName()+" was added",Snackbar.LENGTH_SHORT).show();
-                }
-            }
-        });
-
-        alertDialog.setNegativeButton("NO", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialogInterface, int which) {
-
-                dialogInterface.dismiss();
-            }
-        });
-        alertDialog.show();
-    }
-
-    private void uploadImage() {
-        if (saveUri != null)    {
-            final ProgressDialog mDialog = new ProgressDialog(this);
-            mDialog.setMessage("Uploading...");
-            mDialog.show();
-
-            String imageName = UUID.randomUUID().toString();
-            final StorageReference imageFolder = storageReference.child("images/"+imageName);
-            imageFolder.putFile(saveUri)
-                    .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-                        @Override
-                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                            mDialog.dismiss();
-                            Toast.makeText(FoodList.this, "Uploaded!!!", Toast.LENGTH_SHORT).show();
-
-                            imageFolder.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                                @Override
-                                public void onSuccess(Uri uri) {
-
-                                    newFood = new Food();
-                                    newFood.setName(edtName.getText().toString());
-                                    newFood.setDescription(edtDescription.getText().toString());
-                                    newFood.setPrice(edtPrice.getText().toString());
-                                    newFood.setDiscount(edtDiscount.getText().toString());
-                                    newFood.setMenuId(categoryId);
-                                    newFood.setImage(uri.toString());
-                                }
-                            });
-                        }
-                    })
-                    .addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception e) {
-                            mDialog.dismiss();
-                            Toast.makeText(FoodList.this, ""+e.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    })
-                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
-                        @Override
-                        public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
-                            double progress = (100.0 * taskSnapshot.getBytesTransferred() / taskSnapshot.getTotalByteCount());
-                            mDialog.setMessage("Uploaded "+progress+" %");
-                        }
-                    });
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == Common.PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null)  {
-
-            saveUri = data.getData();
-            btnSelect.setText("Image Selected..");
-        }
-    }
-
-    private void chooseImage() {
-        Intent intent = new Intent();
-        intent.setType("image/*");
-        intent.setAction(Intent.ACTION_GET_CONTENT);
-        startActivityForResult(Intent.createChooser(intent,"Select Picture"), Common.PICK_IMAGE_REQUEST);
-    }
-
-    private void loadListFood(String categoryId) {
-
-        Query listFoodByCategoryId = foodList.orderByChild("menuId").equalTo(categoryId);
-
-        FirebaseRecyclerOptions<Food> options = new FirebaseRecyclerOptions.Builder<Food>()
-                .setQuery(listFoodByCategoryId,Food.class)
+        FirebaseRecyclerOptions<Banner> allBanner = new FirebaseRecyclerOptions.Builder<Banner>()
+                .setQuery(banners,Banner.class)
                 .build();
 
-        adapter = new FirebaseRecyclerAdapter<Food, FoodViewHolder>(options) {
+        adapter = new FirebaseRecyclerAdapter<Banner, BannerViewHolder>(allBanner) {
             @Override
-            protected void onBindViewHolder(@NonNull FoodViewHolder viewHolder, int position, @NonNull Food model) {
+            protected void onBindViewHolder(@NonNull BannerViewHolder holder, int position, @NonNull Banner model) {
+                holder.banner_name.setText(model.getName());
 
-                viewHolder.food_name.setText(model.getName());
-
-                Picasso.with(getBaseContext()).load(model.getImage()).into(viewHolder.food_image);
-
-                viewHolder.setItemClickListener(new ItemClickListener() {
-                    @Override
-                    public void onClick(View view, int position, boolean isLongClick) {
-
-                    }
-                });
+                Picasso.with(getBaseContext()).load(model.getImage()).into(holder.banner_image);
             }
 
             @Override
-            public FoodViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            public BannerViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
                 View itemView = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.food_item,parent,false);
+                        .inflate(R.layout.banner_layout,parent,false);
 
-                return new FoodViewHolder(itemView);
+                return new BannerViewHolder(itemView);
             }
         };
         adapter.startListening();
@@ -285,46 +141,159 @@ public class FoodList extends AppCompatActivity {
         adapter.stopListening();
     }
 
+    private void showAddBanner() {
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(BannerActivity.this);
+        alertDialog.setTitle("Add New Banner");
+        alertDialog.setMessage("Please fill full information");
+
+        LayoutInflater inflater = this.getLayoutInflater();
+
+        View add_banner_layout = inflater.inflate(R.layout.add_new_banner,null);
+
+        edtFoodId = add_banner_layout.findViewById(R.id.edtFoodId);
+        edtName = add_banner_layout.findViewById(R.id.edtFoodName);
+
+        btnSelect = add_banner_layout.findViewById(R.id.btnSelect);
+        btnUpload = add_banner_layout.findViewById(R.id.btnUpload);
+
+        btnSelect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                chooseImage();
+            }
+        });
+
+
+        btnUpload.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                uploadPicture();
+            }
+        });
+
+        alertDialog.setView(add_banner_layout);
+        alertDialog.setIcon(R.drawable.ic_laptop_black_24dp);
+
+        alertDialog.setPositiveButton("CREATE", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int which) {
+                dialogInterface.dismiss();
+                if (newBanner != null) {
+                    banners.push()
+                            .setValue(newBanner);
+                }
+                loadListBanner();
+            }
+        });
+
+        alertDialog.setNegativeButton("CANCEL", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int which) {
+                dialogInterface.dismiss();
+                newBanner = null;
+                loadListBanner();
+            }
+        });
+        alertDialog.show();
+    }
+
+    private void uploadPicture() {
+        if (filePath != null)    {
+            final ProgressDialog mDialog = new ProgressDialog(this);
+            mDialog.setMessage("Uploading...");
+            mDialog.show();
+
+            String imageName = UUID.randomUUID().toString();
+            final StorageReference imageFolder = storageReference.child("images/"+imageName);
+            imageFolder.putFile(filePath)
+                    .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                            mDialog.dismiss();
+                            Toast.makeText(BannerActivity.this, "Uploaded!!!", Toast.LENGTH_SHORT).show();
+
+                            imageFolder.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                                @Override
+                                public void onSuccess(Uri uri) {
+
+                                    newBanner = new Banner();
+                                    newBanner.setName(edtName.getText().toString());
+                                    newBanner.setId(edtFoodId.getText().toString());
+                                    newBanner.setImage(uri.toString());
+                                }
+                            });
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            mDialog.dismiss();
+                            Toast.makeText(BannerActivity.this, ""+e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
+                            double progress = (100.0 * taskSnapshot.getBytesTransferred() / taskSnapshot.getTotalByteCount());
+                            mDialog.setMessage("Uploaded "+progress+" %");
+                        }
+                    });
+        }
+    }
+
+    private void chooseImage() {
+        Intent intent = new Intent();
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        startActivityForResult(Intent.createChooser(intent,"Select Picture"), Common.PICK_IMAGE_REQUEST);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == Common.PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null)  {
+
+            filePath = data.getData();
+            btnSelect.setText("Image Selected..");
+        }
+    }
+
     @Override
     public boolean onContextItemSelected(MenuItem item) {
-
         if (item.getTitle().equals(Common.UPDATE))  {
-            showUpdateFoodDialog(adapter.getRef(item.getOrder()).getKey(),adapter.getItem(item.getOrder()));
+            showUpdateBannerDialog(adapter.getRef(item.getOrder()).getKey(),adapter.getItem(item.getOrder()));
         }
         else if (item.getTitle().equals(Common.DELETE))  {
-            deleteFood(adapter.getRef(item.getOrder()).getKey());
+            deleteBanner(adapter.getRef(item.getOrder()).getKey());
         }
 
         return super.onContextItemSelected(item);
     }
 
-    private void deleteFood(String key) {
-        foodList.child(key).removeValue();
-        Toast.makeText(this, "Food Deleted!!!", Toast.LENGTH_SHORT).show();
+    private void deleteBanner(String key) {
+        banners.child(key).removeValue();
+        Toast.makeText(this, "Banner Deleted!!!", Toast.LENGTH_SHORT).show();
     }
 
-    private void showUpdateFoodDialog(final String key, final Food item) {
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(FoodList.this);
-        alertDialog.setTitle("Edit Food");
+    private void showUpdateBannerDialog(final String key, final Banner item) {
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(BannerActivity.this);
+        alertDialog.setTitle("Edit Banner");
         alertDialog.setMessage("Please fill full information");
 
-        LayoutInflater inflater = this.getLayoutInflater();
+        final LayoutInflater inflater = this.getLayoutInflater();
 
-        View add_menu_layout = inflater.inflate(R.layout.add_new_food_layout,null);
+        View edit_banner = inflater.inflate(R.layout.add_new_banner,null);
 
-        edtName = add_menu_layout.findViewById(R.id.edtName);
-        edtDescription = add_menu_layout.findViewById(R.id.edtDescription);
-        edtPrice = add_menu_layout.findViewById(R.id.edtPrice);
-        edtDiscount = add_menu_layout.findViewById(R.id.edtDiscount);
+        edtName = edit_banner.findViewById(R.id.edtFoodName);
+        edtFoodId = edit_banner.findViewById(R.id.edtFoodId);
 
         //set default value
         edtName.setText(item.getName());
-        edtDescription.setText(item.getDescription());
-        edtPrice.setText(item.getPrice());
-        edtDiscount.setText(item.getDiscount());
+        edtFoodId.setText(item.getId());
 
-        btnSelect = add_menu_layout.findViewById(R.id.btnSelect);
-        btnUpload = add_menu_layout.findViewById(R.id.btnUpload);
+        btnSelect = edit_banner.findViewById(R.id.btnSelect);
+        btnUpload = edit_banner.findViewById(R.id.btnUpload);
 
         //event for button
         btnSelect.setOnClickListener(new View.OnClickListener() {
@@ -341,58 +310,72 @@ public class FoodList extends AppCompatActivity {
             }
         });
 
-        alertDialog.setView(add_menu_layout);
-        alertDialog.setIcon(R.drawable.ic_shopping_cart_black_24dp);
+        alertDialog.setView(edit_banner);
+        alertDialog.setIcon(R.drawable.ic_laptop_black_24dp);
 
         //set button
-        alertDialog.setPositiveButton("YES", new DialogInterface.OnClickListener() {
+        alertDialog.setPositiveButton("CREATE", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int which) {
 
                 dialogInterface.dismiss();
 
-                    //update information
-                    item.setName(edtName.getText().toString());
-                    item.setPrice(edtPrice.getText().toString());
-                    item.setDiscount(edtDiscount.getText().toString());
-                    item.setDescription(edtDescription.getText().toString());
+                item.setName(edtName.getText().toString());
+                item.setId(edtFoodId.getText().toString());
 
-                    foodList.child(key).setValue(item);
+                Map<String, Object> update = new HashMap<>();
+                update.put("id",item.getId());
+                update.put("name",item.getName());
+                update.put("image",item.getImage());
 
-                    Snackbar.make(rootLayout,"Food "+item.getName()+" was edited",Snackbar.LENGTH_SHORT).show();
+                banners.child(key)
+                        .updateChildren(update)
+                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                            @Override
+                            public void onComplete(@NonNull Task<Void> task) {
+                                Snackbar.make(rootLayout,"Updated",Snackbar.LENGTH_SHORT).show();
+                                loadListBanner();
+                            }
+                        });
+                Snackbar.make(rootLayout,"Banner "+item.getName()+" was edited",Snackbar.LENGTH_SHORT).show();
+                loadListBanner();
             }
         });
 
-        alertDialog.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+        alertDialog.setNegativeButton("CANCEL", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int which) {
 
                 dialogInterface.dismiss();
+                loadListBanner();
             }
         });
         alertDialog.show();
     }
 
-    private void changeImage(final Food item) {
-        if (saveUri != null)    {
+    private void changeImage(Banner item) {
+        if (filePath != null)    {
             final ProgressDialog mDialog = new ProgressDialog(this);
             mDialog.setMessage("Uploading...");
             mDialog.show();
 
             String imageName = UUID.randomUUID().toString();
             final StorageReference imageFolder = storageReference.child("images/"+imageName);
-            imageFolder.putFile(saveUri)
+            imageFolder.putFile(filePath)
                     .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                         @Override
                         public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                             mDialog.dismiss();
-                            Toast.makeText(FoodList.this, "Uploaded!!!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(BannerActivity.this, "Uploaded!!!", Toast.LENGTH_SHORT).show();
 
                             imageFolder.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
                                 @Override
                                 public void onSuccess(Uri uri) {
 
-                                    item.setImage(uri.toString());
+                                    newBanner = new Banner();
+                                    newBanner.setName(edtName.getText().toString());
+                                    newBanner.setId(edtFoodId.getText().toString());
+                                    newBanner.setImage(uri.toString());
                                 }
                             });
                         }
@@ -401,14 +384,14 @@ public class FoodList extends AppCompatActivity {
                         @Override
                         public void onFailure(@NonNull Exception e) {
                             mDialog.dismiss();
-                            Toast.makeText(FoodList.this, ""+e.getMessage(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(BannerActivity.this, ""+e.getMessage(), Toast.LENGTH_SHORT).show();
                         }
                     })
                     .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
                         @Override
                         public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
                             double progress = (100.0 * taskSnapshot.getBytesTransferred() / taskSnapshot.getTotalByteCount());
-                            mDialog.setMessage("Uploaded "+progress+"%");
+                            mDialog.setMessage("Uploaded "+progress+" %");
                         }
                     });
         }

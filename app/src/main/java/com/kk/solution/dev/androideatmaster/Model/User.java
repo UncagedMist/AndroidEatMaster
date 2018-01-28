@@ -6,14 +6,23 @@ package com.kk.solution.dev.androideatmaster.Model;
 
 public class User {
 
-    private String Name,Password,Phone,IsStaff;
+    private String Name,Password,Phone,IsStaff,secureCode;
 
     public User() {
     }
 
-    public User(String name, String password) {
+    public User(String name, String password,String secureCode) {
         Name = name;
         Password = password;
+        secureCode = secureCode;
+    }
+
+    public String getSecureCode() {
+        return secureCode;
+    }
+
+    public void setSecureCode(String secureCode) {
+        this.secureCode = secureCode;
     }
 
     public String getName() {

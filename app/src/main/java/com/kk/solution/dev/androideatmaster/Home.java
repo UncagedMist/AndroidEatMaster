@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
@@ -21,10 +22,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
+import com.firebase.ui.database.FirebaseRecyclerOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.database.DataSnapshot;
@@ -41,7 +44,9 @@ import com.google.firebase.storage.UploadTask;
 import com.kk.solution.dev.androideatmaster.Common.Common;
 import com.kk.solution.dev.androideatmaster.Interface.ItemClickListener;
 import com.kk.solution.dev.androideatmaster.Model.Category;
+import com.kk.solution.dev.androideatmaster.Model.Food;
 import com.kk.solution.dev.androideatmaster.Model.Token;
+import com.kk.solution.dev.androideatmaster.ViewHolder.FoodViewHolder;
 import com.kk.solution.dev.androideatmaster.ViewHolder.MenuViewHolder;
 import com.rengwuxian.materialedittext.MaterialEditText;
 import com.squareup.picasso.Picasso;
@@ -49,6 +54,7 @@ import com.squareup.picasso.Picasso;
 import java.util.UUID;
 
 import info.hoang8f.widget.FButton;
+import io.paperdb.Paper;
 
 public class Home extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
@@ -90,6 +96,8 @@ public class Home extends AppCompatActivity
         storage = FirebaseStorage.getInstance();
         storageReference = storage.getReference();
 
+        Paper.init(this);
+
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -115,8 +123,11 @@ public class Home extends AppCompatActivity
 
         recycler_menu = (RecyclerView)findViewById(R.id.recycler_menu);
         recycler_menu.setHasFixedSize(true);
-        layoutManager = new LinearLayoutManager(this);
-        recycler_menu.setLayoutManager(layoutManager);
+
+        //layoutManager = new LinearLayoutManager(this);
+        //recycler_menu.setLayoutManager(layoutManager);
+
+        recycler_menu.setLayoutManager(new GridLayoutManager(this,2));
 
         loadMenu();
 
@@ -246,10 +257,14 @@ public class Home extends AppCompatActivity
     }
 
     private void loadMenu() {
-        adapter = new FirebaseRecyclerAdapter<Category, MenuViewHolder>(
-                Category.class,R.layout.menu_item,MenuViewHolder.class,categories) {
+
+        FirebaseRecyclerOptions<Category> options = new FirebaseRecyclerOptions.Builder<Category>()
+                .setQuery(categories, Category.class)
+                .build();
+
+        adapter = new FirebaseRecyclerAdapter<Category, MenuViewHolder>(options) {
             @Override
-            protected void populateViewHolder(MenuViewHolder viewHolder, Category model, int position) {
+            protected void onBindViewHolder(@NonNull MenuViewHolder viewHolder, int position, @NonNull Category model) {
                 viewHolder.txtMenuName.setText(model.getName());
 
                 Picasso.with(Home.this).load(model.getImage()).into(viewHolder.imageView);
@@ -258,15 +273,40 @@ public class Home extends AppCompatActivity
                     @Override
                     public void onClick(View view, int position, boolean isLongClick) {
 
-                        Intent foodList = new Intent(Home.this,FoodList.class);
-                        foodList.putExtra("CategoryId",adapter.getRef(position).getKey());
+                        Intent foodList = new Intent(Home.this, FoodList.class);
+                        foodList.putExtra("CategoryId", adapter.getRef(position).getKey());
                         startActivity(foodList);
                     }
                 });
             }
+
+            @Override
+            public MenuViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+                View itemView = LayoutInflater.from(parent.getContext())
+                        .inflate(R.layout.menu_item, parent, false);
+
+                return new MenuViewHolder(itemView);
+            }
         };
+        adapter.startListening();
+
         adapter.notifyDataSetChanged();
         recycler_menu.setAdapter(adapter);
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (adapter != null)    {
+            adapter.startListening();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        adapter.stopListening();
     }
 
     @Override
@@ -302,9 +342,24 @@ public class Home extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_orders)  {
+        if (id == R.id.nav_menu)  {
+        }
+        else if(id == R.id.nav_orders)  {
             Intent orders = new Intent(Home.this,OrderStatus.class);
             startActivity(orders);
+        }
+        else if (id == R.id.nav_banner)  {
+            Intent banners = new Intent(Home.this,BannerActivity.class);
+            startActivity(banners);
+        }
+        else if (id == R.id.nav_logout) {
+            //delete remember user and password
+            Paper.book().destroy();
+
+            //logout
+            Intent signOutIntent = new Intent(Home.this,MainActivity.class);
+            signOutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(signOutIntent);
         }
 
         drawer = (DrawerLayout) findViewById(R.id.drawer_layout);

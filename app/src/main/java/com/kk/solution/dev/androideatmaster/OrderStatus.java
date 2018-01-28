@@ -2,6 +2,7 @@ package com.kk.solution.dev.androideatmaster;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -11,9 +12,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
+import com.firebase.ui.database.FirebaseRecyclerOptions;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -22,12 +25,14 @@ import com.google.firebase.database.ValueEventListener;
 import com.jaredrummler.materialspinner.MaterialSpinner;
 import com.kk.solution.dev.androideatmaster.Common.Common;
 import com.kk.solution.dev.androideatmaster.Interface.ItemClickListener;
+import com.kk.solution.dev.androideatmaster.Model.Category;
 import com.kk.solution.dev.androideatmaster.Model.MyResponse;
 import com.kk.solution.dev.androideatmaster.Model.Notification;
 import com.kk.solution.dev.androideatmaster.Model.Request;
 import com.kk.solution.dev.androideatmaster.Model.Sender;
 import com.kk.solution.dev.androideatmaster.Model.Token;
 import com.kk.solution.dev.androideatmaster.Service.APIService;
+import com.kk.solution.dev.androideatmaster.ViewHolder.FoodViewHolder;
 import com.kk.solution.dev.androideatmaster.ViewHolder.OrderViewHolder;
 
 import retrofit2.Call;
@@ -69,11 +74,14 @@ public class OrderStatus extends AppCompatActivity {
     }
 
     private void loadOrders() {
-        adapter = new FirebaseRecyclerAdapter<Request, OrderViewHolder>(
-                Request.class,R.layout.order_layout,OrderViewHolder.class,requests) {
 
+        FirebaseRecyclerOptions<Request> options = new FirebaseRecyclerOptions.Builder<Request>()
+                .setQuery(requests, Request.class)
+                .build();
+
+        adapter = new FirebaseRecyclerAdapter<Request, OrderViewHolder>(options) {
             @Override
-            protected void populateViewHolder(OrderViewHolder viewHolder, final Request model, final int position) {
+            protected void onBindViewHolder(@NonNull OrderViewHolder viewHolder, final int position, @NonNull final Request model) {
                 viewHolder.txtOrderId.setText(adapter.getRef(position).getKey());
                 viewHolder.txtOrderStatus.setText(Common.convertCodeToStatus(model.getStatus()));
                 viewHolder.txtOrderAddress.setText(model.getAddress());
@@ -113,9 +121,33 @@ public class OrderStatus extends AppCompatActivity {
                     }
                 });
             }
+
+            @Override
+            public OrderViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+                View itemView = LayoutInflater.from(parent.getContext())
+                        .inflate(R.layout.order_layout,parent,false);
+
+                return new OrderViewHolder(itemView);
+            }
         };
+        adapter.startListening();
+
         adapter.notifyDataSetChanged();
         recyclerView.setAdapter(adapter);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (adapter != null)    {
+            adapter.startListening();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        adapter.stopListening();
     }
 
     private void deleteOrder(String key) {
