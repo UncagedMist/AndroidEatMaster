@@ -202,7 +202,7 @@ public class OrderStatus extends AppCompatActivity {
                     Token token = postSnapshot.getValue(Token.class);
 
                     //make raw payload
-                    Notification notification = new Notification("kk","Your Order "+key+" was updated ");
+                    Notification notification = new Notification("EatIt Order Food App","Your Order "+key+" was updated ");
                     Sender content = new Sender(token.getToken(),notification);
 
                     mService.sendNotification(content).enqueue(new Callback<MyResponse>() {
