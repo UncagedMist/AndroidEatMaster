@@ -31,12 +31,10 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
+
 import com.kk.solution.dev.androideatmaster.Common.Common;
-import com.kk.solution.dev.androideatmaster.Interface.ItemClickListener;
 import com.kk.solution.dev.androideatmaster.Model.Banner;
-import com.kk.solution.dev.androideatmaster.Model.Food;
 import com.kk.solution.dev.androideatmaster.ViewHolder.BannerViewHolder;
-import com.kk.solution.dev.androideatmaster.ViewHolder.FoodViewHolder;
 import com.rengwuxian.materialedittext.MaterialEditText;
 import com.squareup.picasso.Picasso;
 
@@ -116,7 +114,7 @@ public class BannerActivity extends AppCompatActivity {
             @Override
             public BannerViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
                 View itemView = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.banner_layout,parent,false);
+                        .inflate(R.layout.banner_layout,recyclerView,false);
 
                 return new BannerViewHolder(itemView);
             }

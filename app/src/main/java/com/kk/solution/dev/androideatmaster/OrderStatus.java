@@ -10,7 +10,6 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
@@ -24,16 +23,17 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.jaredrummler.materialspinner.MaterialSpinner;
 import com.kk.solution.dev.androideatmaster.Common.Common;
-import com.kk.solution.dev.androideatmaster.Interface.ItemClickListener;
-import com.kk.solution.dev.androideatmaster.Model.Category;
+import com.kk.solution.dev.androideatmaster.Model.DataMessage;
 import com.kk.solution.dev.androideatmaster.Model.MyResponse;
-import com.kk.solution.dev.androideatmaster.Model.Notification;
 import com.kk.solution.dev.androideatmaster.Model.Request;
-import com.kk.solution.dev.androideatmaster.Model.Sender;
 import com.kk.solution.dev.androideatmaster.Model.Token;
 import com.kk.solution.dev.androideatmaster.Service.APIService;
-import com.kk.solution.dev.androideatmaster.ViewHolder.FoodViewHolder;
 import com.kk.solution.dev.androideatmaster.ViewHolder.OrderViewHolder;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -49,7 +49,7 @@ public class OrderStatus extends AppCompatActivity {
     FirebaseDatabase db;
     DatabaseReference requests;
 
-    MaterialSpinner spinner;
+    MaterialSpinner spinner,shipperSpinner;
 
     APIService mService;
 
@@ -86,6 +86,7 @@ public class OrderStatus extends AppCompatActivity {
                 viewHolder.txtOrderStatus.setText(Common.convertCodeToStatus(model.getStatus()));
                 viewHolder.txtOrderAddress.setText(model.getAddress());
                 viewHolder.txtOrderPhone.setText(model.getPhone());
+                viewHolder.txtOrderDate.setText(Common.getDate(Long.parseLong(adapter.getRef(position).getKey())));
 
                 //new event button
                 viewHolder.btnEdit.setOnClickListener(new View.OnClickListener() {
@@ -163,8 +164,27 @@ public class OrderStatus extends AppCompatActivity {
         LayoutInflater inflater = this.getLayoutInflater();
         final View view = inflater.inflate(R.layout.update_order_layout,null);
 
-        spinner = (MaterialSpinner)view.findViewById(R.id.statusSpinner);
-        spinner.setItems("Placed","On The Way","Shipped");
+        spinner = view.findViewById(R.id.statusSpinner);
+        spinner.setItems("Placed","On The Way","Shipping");
+
+        shipperSpinner = view.findViewById(R.id.shipperSpinner);
+
+        final List<String> shipperList = new ArrayList<>();
+        FirebaseDatabase.getInstance().getReference(Common.SHIPPERS_TABLE)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        for (DataSnapshot shipperSnapshot : dataSnapshot.getChildren()) {
+                            shipperList.add(shipperSnapshot.getKey());
+                        }
+                        shipperSpinner.setItems(shipperList);
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+
+                    }
+                });
 
         alertDialog.setView(view);
 
@@ -178,10 +198,26 @@ public class OrderStatus extends AppCompatActivity {
 
                 item.setStatus(String.valueOf(spinner.getSelectedIndex()));
 
-                requests.child(localKey).setValue(item);
-                adapter.notifyDataSetChanged(); //add to update item size
+                if (item.getStatus().equals("2"))   {
 
-                sendOrderStatusToUser(localKey,item);
+                    FirebaseDatabase.getInstance().getReference(Common.ORDER_NEED_SHIP_TABLE)
+                            .child(shipperSpinner.getItems().get(shipperSpinner.getSelectedIndex()).toString())
+                            .child(localKey)
+                            .setValue(item);
+
+                    requests.child(localKey).setValue(item);
+                    adapter.notifyDataSetChanged(); //add to update item size
+
+                    sendOrderStatusToUser(localKey, item);
+                    sendOrderShipRequestToShipper(shipperSpinner.getItems().get(shipperSpinner.getSelectedIndex()).toString(), item);
+
+                }
+                else {
+                    requests.child(localKey).setValue(item);
+                    adapter.notifyDataSetChanged(); //add to update item size
+
+                    sendOrderStatusToUser(localKey, item);
+                }
             }
         });
         alertDialog.setNegativeButton("NO", new DialogInterface.OnClickListener() {
@@ -193,19 +229,66 @@ public class OrderStatus extends AppCompatActivity {
         alertDialog.show();
     }
 
+    private void sendOrderShipRequestToShipper(String shipperPhone, Request item) {
+
+        DatabaseReference tokens = db.getReference("Tokens");
+
+        tokens.child(shipperPhone)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for (DataSnapshot postSnapshot : dataSnapshot.getChildren())    {
+
+                    Token token = postSnapshot.getValue(Token.class);
+
+                    Map<String,String> dataSend = new HashMap<>();
+                    dataSend.put("title","Eat-it Food Order App");
+                    dataSend.put("message","Your have a new Order to ship");
+
+                    DataMessage dataMessage = new DataMessage(token.getToken(),dataSend);
+
+                    mService.sendNotification(dataMessage).enqueue(new Callback<MyResponse>() {
+                        @Override
+                        public void onResponse(Call<MyResponse> call, Response<MyResponse> response) {
+                            if (response.body().success == 1)   {
+                                Toast.makeText(OrderStatus.this, "Order Sent to Shipper", Toast.LENGTH_SHORT).show();
+                            }
+                            else    {
+                                Toast.makeText(OrderStatus.this, "Order was Sent but Failed To Send Notification!!", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<MyResponse> call, Throwable t) {
+                            Log.e("ERROR",t.getMessage());
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
     private void sendOrderStatusToUser(final String key, Request item) {
         DatabaseReference tokens = db.getReference("Tokens");
-        tokens.orderByKey().equalTo(item.getPhone()).addValueEventListener(new ValueEventListener() {
+        tokens.orderByKey().equalTo(item.getPhone())
+                .addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 for (DataSnapshot postSnapshot : dataSnapshot.getChildren())    {
                     Token token = postSnapshot.getValue(Token.class);
 
-                    //make raw payload
-                    Notification notification = new Notification("EatIt Order Food App","Your Order "+key+" was updated ");
-                    Sender content = new Sender(token.getToken(),notification);
+                    Map<String,String> dataSend = new HashMap<>();
+                    dataSend.put("title","Eat-it Food Order App");
+                    dataSend.put("message","Your Order "+key+" was updated ");
 
-                    mService.sendNotification(content).enqueue(new Callback<MyResponse>() {
+                    DataMessage dataMessage = new DataMessage(token.getToken(),dataSend);
+
+                    mService.sendNotification(dataMessage).enqueue(new Callback<MyResponse>() {
                         @Override
                         public void onResponse(Call<MyResponse> call, Response<MyResponse> response) {
                             if (response.body().success == 1)   {

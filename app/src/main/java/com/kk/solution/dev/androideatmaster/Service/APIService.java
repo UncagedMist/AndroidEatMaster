@@ -1,7 +1,7 @@
 package com.kk.solution.dev.androideatmaster.Service;
 
+import com.kk.solution.dev.androideatmaster.Model.DataMessage;
 import com.kk.solution.dev.androideatmaster.Model.MyResponse;
-import com.kk.solution.dev.androideatmaster.Model.Sender;
 
 import retrofit2.Call;
 import retrofit2.http.Body;
@@ -20,5 +20,5 @@ public interface APIService {
             }
     )
     @POST("fcm/send")
-    Call<MyResponse> sendNotification(@Body Sender body);
+    Call<MyResponse> sendNotification(@Body DataMessage body);
 }

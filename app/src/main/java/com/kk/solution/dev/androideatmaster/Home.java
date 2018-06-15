@@ -85,7 +85,7 @@ public class Home extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        Toolbar toolbar = findViewById(R.id.toolbar);
         toolbar.setTitle("Menu Management");
         setSupportActionBar(toolbar);
 
@@ -351,6 +351,13 @@ public class Home extends AppCompatActivity
         else if (id == R.id.nav_banner)  {
             Intent banners = new Intent(Home.this,BannerActivity.class);
             startActivity(banners);
+        }
+        else if (id == R.id.nav_message)  {
+            Intent messages = new Intent(Home.this,SendMessage.class);
+            startActivity(messages);
+        }
+        else if (id == R.id.nav_shippers)   {
+            startActivity(new Intent(Home.this,ShipperManagement.class));
         }
         else if (id == R.id.nav_logout) {
             //delete remember user and password
